@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 class LaravelAnalytics
 {
     /**
-     * @var Analytics
+     * @var GoogleApiHelper
      */
     protected $client;
 
@@ -80,8 +80,8 @@ class LaravelAnalytics
     /**
      * Get the amount of visitors and pageViews.
      *
-     * @param int    $numberOfDays
-     * @param string $groupBy      Possible values: date, yearMonth
+     * @param int $numberOfDays
+     * @param string $groupBy Possible values: date, yearMonth
      *
      * @return Collection
      */
@@ -97,21 +97,28 @@ class LaravelAnalytics
      *
      * @param DateTime $startDate
      * @param DateTime $endDate
-     * @param string   $groupBy   Possible values: date, yearMonth
+     * @param string   $groupBy Possible values: date, yearMonth
      *
      * @return Collection
      */
     public function getVisitorsAndPageViewsForPeriod(DateTime $startDate, DateTime $endDate, $groupBy = 'date')
     {
         $visitorData = [];
-        $answer = $this->performQuery($startDate, $endDate, 'ga:visits,ga:pageviews', ['dimensions' => 'ga:'.$groupBy]);
+
+        $answer = $this->performQuery($startDate, $endDate, 'ga:visits,ga:pageviews', [
+            'dimensions' => "ga:{$groupBy}"
+        ]);
 
         if (is_null($answer->rows)) {
             return new Collection([]);
         }
 
         foreach ($answer->rows as $dateRow) {
-            $visitorData[] = [$groupBy => Carbon::createFromFormat(($groupBy == 'yearMonth' ? 'Ym' : 'Ymd'), $dateRow[0]), 'visitors' => $dateRow[1], 'pageViews' => $dateRow[2]];
+            $visitorData[] = [
+                $groupBy => Carbon::createFromFormat(($groupBy == 'yearMonth' ? 'Ym' : 'Ymd'), $dateRow[0]),
+                'visitors' => $dateRow[1],
+                'pageViews' => $dateRow[2]
+            ];
         }
 
         return new Collection($visitorData);
@@ -145,14 +152,22 @@ class LaravelAnalytics
     {
         $keywordData = [];
 
-        $answer = $this->performQuery($startDate, $endDate, 'ga:sessions', ['dimensions' => 'ga:keyword', 'sort' => '-ga:sessions', 'max-results' => $maxResults, 'filters' => 'ga:keyword!=(not set);ga:keyword!=(not provided)']);
+        $answer = $this->performQuery($startDate, $endDate, 'ga:sessions', [
+            'dimensions' => 'ga:keyword',
+            'sort' => '-ga:sessions',
+            'max-results' => $maxResults,
+            'filters' => 'ga:keyword!=(not set);ga:keyword!=(not provided)'
+        ]);
 
         if (is_null($answer->rows)) {
             return new Collection([]);
         }
 
         foreach ($answer->rows as $pageRow) {
-            $keywordData[] = ['keyword' => $pageRow[0], 'sessions' => $pageRow[1]];
+            $keywordData[] = [
+                'keyword' => $pageRow[0],
+                'sessions' => $pageRow[1]
+            ];
         }
 
         return new Collection($keywordData);
@@ -186,14 +201,21 @@ class LaravelAnalytics
     {
         $referrerData = [];
 
-        $answer = $this->performQuery($startDate, $endDate, 'ga:pageviews', ['dimensions' => 'ga:fullReferrer', 'sort' => '-ga:pageviews', 'max-results' => $maxResults]);
+        $answer = $this->performQuery($startDate, $endDate, 'ga:pageviews', [
+            'dimensions' => 'ga:fullReferrer',
+            'sort' => '-ga:pageviews',
+            'max-results' => $maxResults
+        ]);
 
         if (is_null($answer->rows)) {
             return new Collection([]);
         }
 
         foreach ($answer->rows as $pageRow) {
-            $referrerData[] = ['url' => $pageRow[0], 'pageViews' => $pageRow[1]];
+            $referrerData[] = [
+                'url' => $pageRow[0],
+                'pageViews' => $pageRow[1]
+            ];
         }
 
         return new Collection($referrerData);
@@ -226,14 +248,21 @@ class LaravelAnalytics
     public function getTopBrowsersForPeriod(DateTime $startDate, DateTime $endDate, $maxResults)
     {
         $browserData = [];
-        $answer = $this->performQuery($startDate, $endDate, 'ga:sessions', ['dimensions' => 'ga:browser', 'sort' => '-ga:sessions']);
+
+        $answer = $this->performQuery($startDate, $endDate, 'ga:sessions', [
+            'dimensions' => 'ga:browser',
+            'sort' => '-ga:sessions'
+        ]);
 
         if (is_null($answer->rows)) {
             return new Collection([]);
         }
 
         foreach ($answer->rows as $browserRow) {
-            $browserData[] = ['browser' => $browserRow[0], 'sessions' => $browserRow[1]];
+            $browserData[] = [
+                'browser' => $browserRow[0],
+                'sessions' => $browserRow[1]
+            ];
         }
 
         $browserCollection = new Collection(array_slice($browserData, 0, $maxResults - 1));
@@ -270,7 +299,7 @@ class LaravelAnalytics
      *
      * @return int
      */
-    public function getActiveUsers($others = array())
+    public function getActiveUsers($others = [])
     {
         $answer = $this->performRealTimeQuery('rt:activeUsers', $others);
 
@@ -294,14 +323,21 @@ class LaravelAnalytics
     {
         $pagesData = [];
 
-        $answer = $this->performQuery($startDate, $endDate, 'ga:pageviews', ['dimensions' => 'ga:pagePath', 'sort' => '-ga:pageviews', 'max-results' => $maxResults]);
+        $answer = $this->performQuery($startDate, $endDate, 'ga:pageviews', [
+            'dimensions' => 'ga:pagePath',
+            'sort' => '-ga:pageviews',
+            'max-results' => $maxResults
+        ]);
 
         if (is_null($answer->rows)) {
             return new Collection([]);
         }
 
         foreach ($answer->rows as $pageRow) {
-            $pagesData[] = ['url' => $pageRow[0], 'pageViews' => $pageRow[1]];
+            $pagesData[] = [
+                'url' => $pageRow[0],
+                'pageViews' => $pageRow[1]
+            ];
         }
 
         return new Collection($pagesData);
@@ -331,9 +367,10 @@ class LaravelAnalytics
      *
      * @return mixed
      */
-    public function performQuery(DateTime $startDate, DateTime $endDate, $metrics, $others = array())
+    public function performQuery(DateTime $startDate, DateTime $endDate, $metrics, $others = [])
     {
-        return $this->client->performQuery($this->siteId, $startDate->format('Y-m-d'), $endDate->format('Y-m-d'), $metrics, $others);
+        return $this->client->performQuery($this->siteId, $startDate->format('Y-m-d'), $endDate->format('Y-m-d'),
+            $metrics, $others);
     }
 
     /**
@@ -344,7 +381,7 @@ class LaravelAnalytics
      *
      * @return mixed
      */
-    public function performRealTimeQuery($metrics, $others = array())
+    public function performRealTimeQuery($metrics, $others = [])
     {
         return $this->client->performRealTimeQuery($this->siteId, $metrics, $others);
     }
