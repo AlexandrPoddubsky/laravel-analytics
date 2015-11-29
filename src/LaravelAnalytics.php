@@ -43,6 +43,41 @@ class LaravelAnalytics
     }
 
     /**
+     * Get the amount of visitors and pageViews for given page URL.
+     *
+     * @param string $url
+     * @param int    $numberOfDays
+     *
+     * @return Collection
+     */
+    public function getPageViews($url, $numberOfDays = 365)
+    {
+        list($startDate, $endDate) = $this->calculateNumberOfDays($numberOfDays);
+
+        $visitorData = [];
+
+        $answer = $this->performQuery($startDate, $endDate, 'ga:visits,ga:pageviews', [
+            'dimensions' => 'ga:date,ga:pagePath',
+            'filters' => "ga:pagePath=={$url}",
+        ]);
+
+        if (is_null($answer->rows)) {
+            return new Collection([]);
+        }
+
+        foreach ($answer->rows as $dataRow) {
+            $visitorData[] = [
+                'date' => Carbon::createFromFormat('Ymd', $dataRow[0]),
+                'path' => $dataRow[1],
+                'visitors' => $dataRow[2],
+                'pageViews' => $dataRow[3]
+            ];
+        }
+
+        return new Collection($visitorData);
+    }
+
+    /**
      * Get the amount of visitors and pageViews.
      *
      * @param int    $numberOfDays
