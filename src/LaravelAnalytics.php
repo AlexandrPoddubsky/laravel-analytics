@@ -57,7 +57,7 @@ class LaravelAnalytics
         $visitorData = [];
 
         $answer = $this->performQuery($startDate, $endDate, 'ga:visits,ga:pageviews', [
-            'dimensions' => 'ga:date,ga:pagePath',
+            'dimensions' => 'ga:pagePath,ga:date',
             'filters' => "ga:pagePath=={$url}",
         ]);
 
@@ -67,8 +67,7 @@ class LaravelAnalytics
 
         foreach ($answer->rows as $dataRow) {
             $visitorData[] = [
-                'date' => Carbon::createFromFormat('Ymd', $dataRow[0]),
-                'path' => $dataRow[1],
+                'date' => Carbon::createFromFormat('Ymd', $dataRow[1]),
                 'visitors' => $dataRow[2],
                 'pageViews' => $dataRow[3]
             ];
