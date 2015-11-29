@@ -134,6 +134,14 @@ Here is an example to retrieve visitors and pageview data for the last seven day
 $analyticsData = LaravelAnalytics::getVisitorsAndPageViews(7);
 ```
 
+Here is an example to retrieve visitors and pageview data on a specific page for the last seven days.
+```php
+/*
+* $analyticsData now contains a Collection with 3 columns: "date", "visitors" and "pageViews"
+*/
+$analyticsData = LaravelAnalytics::getVisitorsAndPageViews('/about', 7);
+```
+
 Here's another example to get the 20 most visited pages of the last 365 days
 ```php
 /*
@@ -144,13 +152,24 @@ $analyticsData = LaravelAnalytics::getMostVisitedPages(365, 20);
 ## Provided methods
 
 ###Visitors and pageviews
-These methods return a Collection with columns "date", "vistors" and "pageViews". When grouping by yearMonth, the first column will be called "yearMonth".
+These methods return a Collection with columns "date", "visitors" and "pageViews". When grouping by yearMonth, the first column will be called "yearMonth".
 ```php
+    /**
+     * Get the amount of visitors and pageViews for given page URL.
+     *
+     * @param string $url
+     * @param int    $numberOfDays
+     *
+     * @return Collection
+     */
+    public function getPageViews($url, $numberOfDays = 365)
+
     /**
      * Get the amount of visitors and pageviews
      *
      * @param int $numberOfDays
      * @param string $groupBy Possible values: date, yearMonth
+     *
      * @return Collection
      */
     public function getVisitorsAndPageViews($numberOfDays = 365, $groupBy = 'date')
@@ -161,6 +180,7 @@ These methods return a Collection with columns "date", "vistors" and "pageViews"
      * @param \DateTime $startDate
      * @param \DateTime $endDate
      * @param string $groupBy Possible values: date, yearMonth
+     *
      * @return Collection
      */
     public function getVisitorsAndPageViewsForPeriod($startDate, $endDate, $groupBy = 'date')
