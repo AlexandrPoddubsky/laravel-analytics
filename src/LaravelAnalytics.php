@@ -2,8 +2,8 @@
 
 namespace Spatie\LaravelAnalytics;
 
-use Carbon\Carbon;
 use DateTime;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class LaravelAnalytics
@@ -43,133 +43,96 @@ class LaravelAnalytics
     }
 
     /**
-     * Get the amount of visitors and pageViews for given page URL.
+     * Get the amount of visitors for given page URL.
      *
-     * @param string $url
+     * @param array  $urls
      * @param int    $numberOfDays
      *
      * @return Collection
      */
-    public function getPageViews($url, $numberOfDays = 365)
+    public function getMultiplePageVisits($urls = [], $numberOfDays = 365)
     {
         list($startDate, $endDate) = $this->calculateNumberOfDays($numberOfDays);
 
-        $visitorData = [];
-
-        $answer = $this->performQuery($startDate, $endDate, 'ga:visits,ga:pageviews', [
+        $answer = $this->performQuery($startDate, $endDate, 'ga:pageviews', [
             'dimensions' => 'ga:pagePath,ga:date',
-            'filters' => "ga:pagePath=={$url}",
+            'filters' => "ga:pagePath==" . implode(',ga:pagePath==', $urls),
         ]);
 
+        // Get empty data array
+        $visitorData = $this->getEmptyDateRangeData($urls, $startDate, $endDate);
+
+        // No data...sad
         if (is_null($answer->rows)) {
-            return new Collection([]);
+            return new Collection($visitorData);
         }
 
+        // Merge Analytic data with days
         foreach ($answer->rows as $dataRow) {
-            $visitorData[] = [
-                'date' => Carbon::createFromFormat('Ymd', $dataRow[1]),
-                'visitors' => $dataRow[2],
-                'pageViews' => $dataRow[3]
-            ];
+            $date = Carbon::createFromFormat('Ymd H:i:s', "{$dataRow[1]} 00:00:00")->format('U') * 1000;
+
+            if (isset($visitorData[$dataRow[0]][$date])) {
+                $visitorData[$dataRow[0]][$date] = $dataRow[2];
+            }
         }
 
         return new Collection($visitorData);
     }
 
     /**
-     * Get the amount of visitors and pageViews.
+     * Get the amount of visitors and pageViews for given page URL.
      *
-     * @param int $numberOfDays
-     * @param string $groupBy Possible values: date, yearMonth
+     * @param string $metrics
+     * @param int    $numberOfDays
+     * @param int    $limit
      *
      * @return Collection
      */
-    public function getVisitorsAndPageViews($numberOfDays = 365, $groupBy = 'date')
+    public function getSeriesPageViews($metrics, $numberOfDays = 7, $limit = 20)
     {
         list($startDate, $endDate) = $this->calculateNumberOfDays($numberOfDays);
 
-        return $this->getVisitorsAndPageViewsForPeriod($startDate, $endDate, $groupBy);
-    }
 
-    /**
-     * Get the amount of visitors and pageviews for the given period.
-     *
-     * @param DateTime $startDate
-     * @param DateTime $endDate
-     * @param string   $groupBy Possible values: date, yearMonth
-     *
-     * @return Collection
-     */
-    public function getVisitorsAndPageViewsForPeriod(DateTime $startDate, DateTime $endDate, $groupBy = 'date')
-    {
+        $collecion = new Collection([
+            2 => 13,
+            3 => 10,
+            4 => 10,
+            5 => 8,
+            12 => 3,
+            13 => 2,
+            66 => 2,
+        ]);
+
+        return $collecion;
+
+
+
         $visitorData = [];
 
-        $answer = $this->performQuery($startDate, $endDate, 'ga:visits,ga:pageviews', [
-            'dimensions' => "ga:{$groupBy}"
+//        $answer = $this->performQuery($startDate, $endDate, 'ga:visits,ga:pageviews', [
+//            'metrics' => 'ga:pageviews',
+//            'dimensions' => 'ga:pagePath',
+//            'filters' => "ga:pagePath=~^/series/.*/;ga:pagePath!@/episodes/",
+//            'sort' => "-ga:pageviews",
+//            'max-results' => $limit,
+//        ]);
+
+        $answer = $this->performQuery($startDate, $endDate, 'ga:totalEvents', [
+            'dimensions' => 'ga:eventLabel',
+            'filters' => 'ga:eventCategory==Series;ga:eventAction==view',
+            'sort' => '-ga:eventLabel',
+            'max-results' => $limit,
         ]);
 
         if (is_null($answer->rows)) {
-            return new Collection([]);
+            return new Collection($visitorData);
         }
-
-        foreach ($answer->rows as $dateRow) {
-            $visitorData[] = [
-                $groupBy => Carbon::createFromFormat(($groupBy == 'yearMonth' ? 'Ym' : 'Ymd'), $dateRow[0]),
-                'visitors' => $dateRow[1],
-                'pageViews' => $dateRow[2]
-            ];
+dd($answer->rows);
+        foreach ($answer->rows as $pageRow) {
+            $visitorData[$pageRow[0]] = $pageRow[1];
         }
 
         return new Collection($visitorData);
-    }
-
-    /**
-     * Get the top keywords.
-     *
-     * @param int $numberOfDays
-     * @param int $maxResults
-     *
-     * @return Collection
-     */
-    public function getTopKeywords($numberOfDays = 365, $maxResults = 30)
-    {
-        list($startDate, $endDate) = $this->calculateNumberOfDays($numberOfDays);
-
-        return $this->getTopKeyWordsForPeriod($startDate, $endDate, $maxResults);
-    }
-
-    /**
-     * Get the top keywords for the given period.
-     *
-     * @param DateTime $startDate
-     * @param DateTime $endDate
-     * @param int      $maxResults
-     *
-     * @return Collection
-     */
-    public function getTopKeyWordsForPeriod(DateTime $startDate, DateTime $endDate, $maxResults = 30)
-    {
-        $keywordData = [];
-
-        $answer = $this->performQuery($startDate, $endDate, 'ga:sessions', [
-            'dimensions' => 'ga:keyword',
-            'sort' => '-ga:sessions',
-            'max-results' => $maxResults,
-            'filters' => 'ga:keyword!=(not set);ga:keyword!=(not provided)'
-        ]);
-
-        if (is_null($answer->rows)) {
-            return new Collection([]);
-        }
-
-        foreach ($answer->rows as $pageRow) {
-            $keywordData[] = [
-                'keyword' => $pageRow[0],
-                'sessions' => $pageRow[1]
-            ];
-        }
-
-        return new Collection($keywordData);
     }
 
     /**
@@ -218,95 +181,6 @@ class LaravelAnalytics
         }
 
         return new Collection($referrerData);
-    }
-
-    /**
-     * Get the top browsers.
-     *
-     * @param int $numberOfDays
-     * @param int $maxResults
-     *
-     * @return Collection
-     */
-    public function getTopBrowsers($numberOfDays = 365, $maxResults = 6)
-    {
-        list($startDate, $endDate) = $this->calculateNumberOfDays($numberOfDays);
-
-        return $this->getTopBrowsersForPeriod($startDate, $endDate, $maxResults);
-    }
-
-    /**
-     * Get the top browsers for the given period.
-     *
-     * @param DateTime $startDate
-     * @param DateTime $endDate
-     * @param int      $maxResults
-     *
-     * @return Collection
-     */
-    public function getTopBrowsersForPeriod(DateTime $startDate, DateTime $endDate, $maxResults)
-    {
-        $browserData = [];
-
-        $answer = $this->performQuery($startDate, $endDate, 'ga:sessions', [
-            'dimensions' => 'ga:browser',
-            'sort' => '-ga:sessions'
-        ]);
-
-        if (is_null($answer->rows)) {
-            return new Collection([]);
-        }
-
-        foreach ($answer->rows as $browserRow) {
-            $browserData[] = [
-                'browser' => $browserRow[0],
-                'sessions' => $browserRow[1]
-            ];
-        }
-
-        $browserCollection = new Collection(array_slice($browserData, 0, $maxResults - 1));
-
-        if (count($browserData) > $maxResults) {
-            $otherBrowsers = new Collection(array_slice($browserData, $maxResults - 1));
-            $otherBrowsersCount = array_sum(Collection::make($otherBrowsers->lists('sessions'))->toArray());
-
-            $browserCollection->put(null, ['browser' => 'other', 'sessions' => $otherBrowsersCount]);
-        }
-
-        return $browserCollection;
-    }
-
-    /**
-     * Get the most visited pages.
-     *
-     * @param int $numberOfDays
-     * @param int $maxResults
-     *
-     * @return Collection
-     */
-    public function getMostVisitedPages($numberOfDays = 365, $maxResults = 20)
-    {
-        list($startDate, $endDate) = $this->calculateNumberOfDays($numberOfDays);
-
-        return $this->getMostVisitedPagesForPeriod($startDate, $endDate, $maxResults);
-    }
-
-    /**
-     * Get the number of active users currently on the site.
-     *
-     * @param array $others
-     *
-     * @return int
-     */
-    public function getActiveUsers($others = [])
-    {
-        $answer = $this->performRealTimeQuery('rt:activeUsers', $others);
-
-        if (is_null($answer->rows)) {
-            return 0;
-        }
-
-        return $answer->rows[0][0];
     }
 
     /**
@@ -398,14 +272,45 @@ class LaravelAnalytics
     /**
      * Returns an array with the current date and the date minus the number of days specified.
      *
+     * @param array $urls
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     *
+     * @return array
+     */
+    private function getEmptyDateRangeData($urls, $startDate, $endDate)
+    {
+        $data = [];
+
+        // Difference in days
+        $numberOfDays = $startDate->diffInDays($endDate);
+
+        // Create date range array
+        $range = [];
+        for ($i = 0; $i < $numberOfDays; $i++) {
+            $day = $startDate->addDay()->format('U') * 1000;
+            $range[$day] = 0;
+        }
+
+        // Add ranges to data
+        foreach ($urls as $url) {
+            $data[$url] = $range;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Returns an array with the current date and the date minus the number of days specified.
+     *
      * @param int $numberOfDays
      *
      * @return array
      */
     private function calculateNumberOfDays($numberOfDays)
     {
-        $endDate = Carbon::today();
-        $startDate = Carbon::today()->subDays($numberOfDays);
+        $endDate = Carbon::today()->subDays(1);
+        $startDate = Carbon::today()->subDays($numberOfDays + 1);
 
         return [$startDate, $endDate];
     }

@@ -322,6 +322,10 @@ Run the tests with:
 vendor/bin/phpunit
 ```
 
+## Roadmap
+
+- Add config for cache tagging, this will allow for a cron job to clear the daily stats at a set time.
+
 ## Contributing
 
 Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
